@@ -1,0 +1,50 @@
+name: Build AFROTUNE (Mac + Windows)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (universal build for Apple Silicon and Intel)
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Ad-hoc sign and zip
+        run: |
+          cd build/AFROTUNE_artefacts/Release
+          codesign --force --deep -s - VST3/AFROTUNE.vst3
+          codesign --force --deep -s - AU/AFROTUNE.component
+          mkdir -p ../../../out
+          ditto -c -k --keepParent VST3/AFROTUNE.vst3 ../../../out/AFROTUNE-VST3-mac.zip
+          ditto -c -k --keepParent AU/AFROTUNE.component ../../../out/AFROTUNE-AU-mac.zip
+
+      - name: Upload Mac plugins
+        uses: actions/upload-artifact@v4
+        with:
+          name: AFROTUNE-Mac
+          path: out/*.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload Windows VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: AFROTUNE-Windows-VST3
+          path: build/AFROTUNE_artefacts/Release/VST3/AFROTUNE.vst3
